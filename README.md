@@ -141,7 +141,7 @@ This section is for developers who want to:
 
 ```bash
 # Clone the repository
-git clone https://github.com/prometheux-ar/px-mcp-server.git
+git clone https://github.com/prometheuxresearch/px-mcp-server.git
 cd px-mcp-server
 
 # Create virtual environment
