@@ -2,7 +2,7 @@
 
 [![PyPI version](https://badge.fury.io/py/prometheux-mcp.svg)](https://badge.fury.io/py/prometheux-mcp)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![License: BSD-3-Clause](https://img.shields.io/badge/License-BSD%203--Clause-blue.svg)](https://opensource.org/licenses/BSD-3-Clause)
 
 A [Model Context Protocol (MCP)](https://modelcontextprotocol.io) client that enables AI agents like Claude to interact with [Prometheux](https://prometheux.ai) knowledge graphs and reasoning capabilities.
 
@@ -282,18 +282,40 @@ Executes a concept to derive new knowledge through Vadalog reasoning.
 
 ---
 
-## Related Projects
+## Access to Prometheux Backend
 
-- [Prometheux](https://prometheux.ai) — Knowledge graph and reasoning platform
-- [JarvisPy](https://github.com/prometheux-ar/jarvispy) — Prometheux backend (server-side MCP endpoints)
-- [Model Context Protocol](https://modelcontextprotocol.io) — Open standard for AI tool integration
+The Prometheux backend is required to use this MCP client. To request access:
+
+- 📧 **Email**: davben@prometheux.co.uk or support@prometheux.co.uk
+- 🌐 **Website**: https://www.prometheux.ai
 
 ## License
 
-MIT License — Copyright (C) Prometheux Limited.
+BSD 3-Clause License — see [LICENSE](LICENSE) file for details.
+
+## About Prometheux
+
+Prometheux is an **ontology native data engine** that processes data anywhere it lives. Define ontologies once and unlock knowledge that spans databases, warehouses, and platforms—built on the Vadalog reasoning engine.
+
+**Key capabilities:**
+- **Connect**: Query across Snowflake, Databricks, Neo4j, SQL, CSV, and more without ETL or vendor lock-in
+- **Think**: Replace 100+ lines of PySpark/SQL with simple declarative logic. Power graph analytics without GraphDBs
+- **Explain**: Full lineage & traceability with deterministic, repeatable results. Ground AI in structured, explainable context
+
+Exponentially faster and simpler than traditional approaches. Learn more at [prometheux.ai](https://prometheux.ai/).
 
 ## Support
 
-- **Documentation**: [docs.prometheux.ai](https://docs.prometheux.ai)
-- **Issues**: [GitHub Issues](https://github.com/prometheux-ar/px-mcp-server/issues)
-- **Email**: support@prometheux.ai
+For issues, questions, or access requests:
+
+- **Homepage**: https://www.prometheux.ai
+- **PyPI**: https://pypi.org/project/prometheux-mcp/
+- **Email**: davben@prometheux.co.uk or support@prometheux.co.uk
+- **Documentation**: https://docs.prometheux.ai/mcp
+- **Issues**: [GitHub Issues](https://github.com/prometheuxresearch/px-mcp-server/issues)
+
+## Related Projects
+
+- [Prometheux Chain](https://pypi.org/project/prometheux-chain/) — Python SDK for Prometheux
+- [Vadalog Extension](https://pypi.org/project/vadalog-extension/) — JupyterLab extension for Vadalog
+- [Vadalog Jupyter Kernel](https://pypi.org/project/vadalog-jupyter-kernel/) — Jupyter kernel for Vadalog
