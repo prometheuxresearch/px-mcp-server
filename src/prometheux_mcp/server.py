@@ -166,7 +166,7 @@ def run_server(settings: Settings):
     
     if settings.debug:
         print(f"MCP Server 'prometheux' starting...", file=sys.stderr)
-        print(f"Connected to: {settings.url}", file=sys.stderr)
+        print(f"Connected to: {settings.base_url}", file=sys.stderr)
     
     # Run with stdio transport
     mcp.run(transport="stdio")
