@@ -25,17 +25,26 @@ This package lets you use **Claude Desktop** to interact with your Prometheux pr
 
 ### Installation
 
+**Option 1: Using pipx (Recommended for Claude Desktop)**
+
+```bash
+# Install pipx if you don't have it
+brew install pipx
+pipx ensurepath
+
+# Install prometheux-mcp
+pipx install prometheux-mcp
+```
+
+This installs the package in an isolated environment and makes the `prometheux-mcp` command available globally.
+
+**Option 2: Using pip**
+
 ```bash
 pip install prometheux-mcp
 ```
 
-**macOS users:** If you encounter permission issues with Claude Desktop, use pipx instead:
-
-```bash
-brew install pipx
-pipx ensurepath
-pipx install prometheux-mcp
-```
+> **Note for macOS users:** Claude Desktop may have permission issues accessing pip-installed packages in certain directories. If you encounter "Server disconnected" errors, use pipx instead.
 
 ### Configuration
 
@@ -50,6 +59,7 @@ pipx install prometheux-mcp
    **macOS:** `~/Library/Application Support/Claude/claude_desktop_config.json`  
    **Windows:** `%APPDATA%\Claude\claude_desktop_config.json`
 
+   **If installed with pipx (recommended):**
    ```json
    {
      "mcpServers": {
@@ -65,8 +75,35 @@ pipx install prometheux-mcp
      }
    }
    ```
+   
+   > **Note:** The full JarvisPy path (`/jarvispy/{organization}/{username}`) is automatically constructed from your username and organization. No need to include it in the URL!
 
-   > **macOS with pipx:** Use the full path `~/.local/bin/prometheux-mcp` for the command.
+   **If pipx isn't in PATH, use the full path:**
+   ```json
+   {
+     "mcpServers": {
+       "prometheux": {
+         "command": "/Users/YOUR_USERNAME/.local/bin/prometheux-mcp",
+         "args": ["--url", "https://api.prometheux.ai"],
+         "env": {
+           "PROMETHEUX_TOKEN": "your_token",
+           "PROMETHEUX_USERNAME": "your_username",
+           "PROMETHEUX_ORGANIZATION": "your_organization"
+         }
+       }
+     }
+   }
+   ```
+   
+   > Replace `YOUR_USERNAME` with your actual macOS username, or find the path with: `which prometheux-mcp`
+   
+   **For custom deployments with full URL:**
+   
+   If you need to specify the complete JarvisPy path (e.g., for custom routing), you can include it in the URL:
+   ```json
+   "args": ["--url", "https://api.prometheux.ai/jarvispy/myorg/myuser"]
+   ```
+   In this case, the organization and username from `env` are still used for authentication, but the URL is used as-is.
 
 3. **Restart Claude Desktop** (quit completely with Cmd+Q, then reopen)
 
@@ -90,13 +127,19 @@ Once configured, just chat with Claude:
 ### Troubleshooting
 
 **"Server disconnected" error (macOS):**
-Install with pipx and use the full path `~/.local/bin/prometheux-mcp` in your config.
+1. Uninstall: `pip uninstall prometheux-mcp`
+2. Install with pipx: `pipx install prometheux-mcp`
+3. Update your config with either `"command": "prometheux-mcp"` or the full path from `which prometheux-mcp`
+4. Restart Claude Desktop completely (Cmd+Q, then reopen)
 
 **"Connection refused" error:**
-Check that your Prometheux server URL is correct and accessible.
+Check that your Prometheux server URL is correct and accessible. Test with: `curl [YOUR_URL]/mcp/info`
 
 **"Authentication failed" error:**
-Verify your token, username, and organization are correct.
+Verify your token, username, and organization are correct in the config.
+
+**"command not found" error:**
+If using pipx, ensure it's in your PATH: `pipx ensurepath` then restart your terminal or Claude Desktop.
 
 **Check logs:**
 `~/Library/Logs/Claude/mcp-server-prometheux.log`
@@ -286,7 +329,7 @@ Executes a concept to derive new knowledge through Vadalog reasoning.
 
 The Prometheux backend is required to use this MCP client. To request access:
 
-- 📧 **Email**: davben@prometheux.co.uk or support@prometheux.co.uk
+- 📧 **Email**: davben@prometheux.co.uk, teodoro.baldazzi@prometheux.co.uk, or support@prometheux.co.uk
 - 🌐 **Website**: https://www.prometheux.ai
 
 ## License
@@ -310,7 +353,7 @@ For issues, questions, or access requests:
 
 - **Homepage**: https://www.prometheux.ai
 - **PyPI**: https://pypi.org/project/prometheux-mcp/
-- **Email**: davben@prometheux.co.uk or support@prometheux.co.uk
+- **Email**: davben@prometheux.co.uk, teodoro.baldazzi@prometheux.co.uk, or support@prometheux.co.uk
 - **Documentation**: https://docs.prometheux.ai/mcp
 - **Issues**: [GitHub Issues](https://github.com/prometheuxresearch/px-mcp-server/issues)
 

@@ -74,9 +74,31 @@ class Settings:
             )
     
     @property
+    def base_url(self) -> str:
+        """
+        Get the full base URL for API requests.
+        
+        If username and organization are provided, automatically constructs
+        the full JarvisPy path: {url}/jarvispy/{organization}/{username}
+        
+        Otherwise, returns the URL as-is (for backward compatibility).
+        """
+        if not self.url:
+            return ""
+        
+        # If both username and organization are provided, construct the full path
+        if self.username and self.organization:
+            # Check if the URL already contains the jarvispy path
+            if "/jarvispy/" not in self.url:
+                return f"{self.url}/jarvispy/{self.organization}/{self.username}"
+        
+        # Return URL as-is if no username/org or path already included
+        return self.url
+    
+    @property
     def mcp_endpoint(self) -> str:
         """Get the MCP messages endpoint URL."""
-        return f"{self.url}/mcp/messages"
+        return f"{self.base_url}/mcp/messages"
     
     @property
     def has_auth(self) -> bool:
