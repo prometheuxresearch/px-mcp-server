@@ -60,7 +60,7 @@ class PrometheuxClient:
         if not self.settings.url:
             raise ValueError("Prometheux URL is required. Settings must be validated before use.")
         self._client = httpx.AsyncClient(
-            base_url=self.settings.url,
+            base_url=self.settings.base_url,
             headers=self._get_headers(),
             timeout=60.0,
         )
@@ -87,7 +87,7 @@ class PrometheuxClient:
             if not self.settings.url:
                 raise ValueError("Prometheux URL is required. Settings must be validated before use.")
             self._client = httpx.AsyncClient(
-                base_url=self.settings.url,
+                base_url=self.settings.base_url,
                 headers=self._get_headers(),
                 timeout=60.0,
             )
@@ -149,7 +149,7 @@ class PrometheuxClient:
             
         except httpx.ConnectError as e:
             raise PrometheuxError(
-                f"Failed to connect to Prometheux server at {self.settings.url}. "
+                f"Failed to connect to Prometheux server at {self.settings.base_url}. "
                 f"Is the server running? Error: {e}"
             )
         except httpx.TimeoutException as e:
