@@ -35,7 +35,7 @@ setup(
     description='Model Context Protocol (MCP) server for Prometheux - enabling AI agents to interact with knowledge graphs and reasoning',
     long_description=long_description,
     long_description_content_type='text/markdown',
-    url='https://github.com/prometheux-ar/px-mcp-server',
+    url='https://github.com/prometheuxresearch/px-mcp-server',
     classifiers=[
         'Development Status :: 4 - Beta',
         'Intended Audience :: Developers',
