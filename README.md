@@ -68,7 +68,7 @@ pip install prometheux-mcp
    {
      "mcpServers": {
        "prometheux": {
-         "command": "prometheux-mcp",
+         "command": "/Users/YOUR_USERNAME/.local/bin/prometheux-mcp",
          "args": ["--url", "https://api.prometheux.ai"],
          "env": {
            "PROMETHEUX_TOKEN": "your_token",
@@ -80,9 +80,14 @@ pip install prometheux-mcp
    }
    ```
    
-   > **macOS Users:** If you get "Server disconnected" errors, use the full path instead of `"prometheux-mcp"`. Find it with `which prometheux-mcp` (usually `/Users/YOUR_USERNAME/.local/bin/prometheux-mcp` or similar).
-   
-   > **Windows Users:** If you get "command not found", use the full path like `"C:\\Users\\YOUR_USERNAME\\AppData\\Local\\Programs\\Python\\Python310\\Scripts\\prometheux-mcp.exe"`. Find it with `where prometheux-mcp` in PowerShell.
+   > **Finding Your Path:** Run this in your terminal to find the full path:
+   > - **macOS/Linux:** `which prometheux-mcp`
+   > - **Windows:** `where prometheux-mcp` (in PowerShell or Command Prompt)
+   >
+   > **Common paths:**
+   > - macOS: `/Users/YOUR_USERNAME/.local/bin/prometheux-mcp`
+   > - Windows: `C:\\Users\\YOUR_USERNAME\\AppData\\Local\\Programs\\Python\\Python310\\Scripts\\prometheux-mcp.exe` (use double backslashes in JSON)
+   > - Linux: `/home/YOUR_USERNAME/.local/bin/prometheux-mcp`
    
    > **Note:** The full path is automatically constructed from your username and organization. No need to include it in the URL!
    
