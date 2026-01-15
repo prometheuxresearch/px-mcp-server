@@ -25,26 +25,30 @@ This package lets you use **Claude Desktop** to interact with your Prometheux pr
 
 ### Installation
 
-**Option 1: Using pipx (Recommended for Claude Desktop)**
+**Using pipx (Recommended)**
 
+pipx installs the package in an isolated environment and works reliably with Claude Desktop on all platforms.
+
+**macOS:**
 ```bash
-# Install pipx if you don't have it
 brew install pipx
 pipx ensurepath
-
-# Install prometheux-mcp
 pipx install prometheux-mcp
 ```
 
-This installs the package in an isolated environment and makes the `prometheux-mcp` command available globally.
+**Windows/Linux:**
+```bash
+pip install pipx
+pipx install prometheux-mcp
+```
 
-**Option 2: Using pip**
+**Alternative: Using pip (Windows/Linux only)**
 
 ```bash
 pip install prometheux-mcp
 ```
 
-> **Note for macOS users:** Claude Desktop may have permission issues accessing pip-installed packages in certain directories. If you encounter "Server disconnected" errors, use pipx instead.
+> **macOS users:** pip may have permission issues with Claude Desktop. Use pipx instead.
 
 ### Configuration
 
@@ -59,12 +63,12 @@ pip install prometheux-mcp
    **macOS:** `~/Library/Application Support/Claude/claude_desktop_config.json`  
    **Windows:** `%APPDATA%\Claude\claude_desktop_config.json`
 
-   **Recommended: Use the full path**
+   **Configuration Example:**
    ```json
    {
      "mcpServers": {
        "prometheux": {
-         "command": "/Users/YOUR_USERNAME/.local/bin/prometheux-mcp",
+         "command": "prometheux-mcp",
          "args": ["--url", "https://api.prometheux.ai"],
          "env": {
            "PROMETHEUX_TOKEN": "your_token",
@@ -76,11 +80,13 @@ pip install prometheux-mcp
    }
    ```
    
-   > **Find your path:** Run `which prometheux-mcp` in your terminal and use that exact path. Replace `YOUR_USERNAME` with your actual macOS username (usually it will be in `~/.local/bin/`).
+   > **macOS Users:** If you get "Server disconnected" errors, use the full path instead of `"prometheux-mcp"`. Find it with `which prometheux-mcp` (usually `/Users/YOUR_USERNAME/.local/bin/prometheux-mcp` or similar).
    
-   > **Why the full path?** GUI applications like Claude Desktop don't inherit your terminal's PATH environment on macOS, even after `pipx ensurepath`. Using the full path ensures it always works.
+   > **Windows Users:** If you get "command not found", use the full path like `"C:\\Users\\YOUR_USERNAME\\AppData\\Local\\Programs\\Python\\Python310\\Scripts\\prometheux-mcp.exe"`. Find it with `where prometheux-mcp` in PowerShell.
    
-   > **Note:** The full JarvisPy path (`/jarvispy/{organization}/{username}`) is automatically constructed from your username and organization. No need to include it in the URL!
+   > **Note:** The full path is automatically constructed from your username and organization. No need to include it in the URL!
+   
+   > **Custom URLs:** For on-premise deployments or custom URLs, replace `https://api.prometheux.ai` with your own server URL.
 
 3. **Restart Claude Desktop** (quit completely with Cmd+Q, then reopen)
 
@@ -103,14 +109,18 @@ Once configured, just chat with Claude:
 
 ### Troubleshooting
 
-**"Server disconnected" error (macOS):**
-1. **Use the full path** in your config: Run `which prometheux-mcp` and use that exact path
-2. If installed with pip instead of pipx:
-   - Uninstall: `pip uninstall prometheux-mcp`
-   - Install with pipx: `pipx install prometheux-mcp`
-3. Restart Claude Desktop completely (Cmd+Q, then reopen)
+**"command not found" or "Server disconnected" errors:**
 
-> **Note:** On macOS, the short command `"prometheux-mcp"` usually doesn't work with Claude Desktop because GUI apps don't inherit the terminal's PATH. Always use the full path for reliability.
+*macOS:*
+1. Find the full path: `which prometheux-mcp`
+2. Use that full path in your config (usually `/Users/YOUR_USERNAME/.local/bin/prometheux-mcp`)
+3. If still having issues, try pipx: `pipx install prometheux-mcp`
+4. Restart Claude Desktop completely (Cmd+Q, then reopen)
+
+*Windows:*
+1. Find the full path: `where prometheux-mcp` (in PowerShell or Command Prompt)
+2. Use that full path in your config with double backslashes (e.g., `C:\\Python310\\Scripts\\prometheux-mcp.exe`)
+3. Restart Claude Desktop
 
 **"Connection refused" error:**
 Check that your Prometheux server URL is correct and accessible. Test with: `curl [YOUR_URL]/mcp/info`
@@ -118,11 +128,9 @@ Check that your Prometheux server URL is correct and accessible. Test with: `cur
 **"Authentication failed" error:**
 Verify your token, username, and organization are correct in the config.
 
-**"command not found" error:**
-This means Claude Desktop can't find the `prometheux-mcp` command. **Solution:** Use the full path in your config (see Configuration section above). Run `which prometheux-mcp` to find the exact path.
-
 **Check logs:**
-`~/Library/Logs/Claude/mcp-server-prometheux.log`
+- **macOS:** `~/Library/Logs/Claude/mcp-server-prometheux.log`
+- **Windows:** `%APPDATA%\Claude\logs\mcp-server-prometheux.log`
 
 ---
 
