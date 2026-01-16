@@ -25,7 +25,7 @@ This package lets you use **Claude Desktop** to interact with your Prometheux pr
 
 ### Installation
 
-**Using pipx (Recommended)**
+**Using pipx**
 
 pipx installs the package in an isolated environment and works reliably with Claude Desktop on all platforms.
 
@@ -36,19 +36,19 @@ pipx ensurepath
 pipx install prometheux-mcp
 ```
 
-**Windows/Linux:**
+**Windows:**
 ```bash
 pip install pipx
+pipx ensurepath
 pipx install prometheux-mcp
 ```
 
-**Alternative: Using pip (Windows/Linux only)**
-
+**Linux:**
 ```bash
-pip install prometheux-mcp
+pip install pipx
+pipx ensurepath
+pipx install prometheux-mcp
 ```
-
-> **macOS users:** pip may have permission issues with Claude Desktop. Use pipx instead.
 
 ### Configuration
 
@@ -84,10 +84,10 @@ pip install prometheux-mcp
    > - **macOS/Linux:** `which prometheux-mcp`
    > - **Windows:** `where prometheux-mcp` (in PowerShell or Command Prompt)
    >
-   > **Common paths:**
-   > - macOS: `/Users/YOUR_USERNAME/.local/bin/prometheux-mcp`
-   > - Windows: `C:\\Users\\YOUR_USERNAME\\AppData\\Local\\Programs\\Python\\Python310\\Scripts\\prometheux-mcp.exe` (use double backslashes in JSON)
-   > - Linux: `/home/YOUR_USERNAME/.local/bin/prometheux-mcp`
+   > **Common paths after pipx install:**
+   > - **macOS:** `/Users/YOUR_USERNAME/.local/bin/prometheux-mcp`
+   > - **Windows:** `C:\\Users\\YOUR_USERNAME\\.local\\bin\\prometheux-mcp.exe` (use double backslashes in JSON)
+   > - **Linux:** `/home/YOUR_USERNAME/.local/bin/prometheux-mcp`
    
    > **Note:** The full path is automatically constructed from your username and organization. No need to include it in the URL!
    
@@ -124,7 +124,7 @@ Once configured, just chat with Claude:
 
 *Windows:*
 1. Find the full path: `where prometheux-mcp` (in PowerShell or Command Prompt)
-2. Use that full path in your config with double backslashes (e.g., `C:\\Python310\\Scripts\\prometheux-mcp.exe`)
+2. Use that full path in your config with double backslashes (e.g., `C:\\Users\\YOUR_USERNAME\\.local\\bin\\prometheux-mcp.exe`)
 3. Restart Claude Desktop
 
 **"Connection refused" error:**
