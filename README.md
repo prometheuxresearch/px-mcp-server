@@ -21,13 +21,44 @@ This package lets you use **Claude Desktop** to interact with your Prometheux pr
 
 - **Prometheux account** with access to a deployed instance
 - **Claude Desktop** installed on your machine
-- **Your credentials** (token, username, organization) from your Prometheux admin
+- **Your authentication token** from your Prometheux account settings
 
 ### Installation
 
-**Using pipx**
+#### Option 1: Automated Install (Recommended)
 
-pipx installs the package in an isolated environment and works reliably with Claude Desktop on all platforms.
+The easiest way to install - download and run our installation script:
+
+**macOS/Linux:**
+```bash
+curl -sSL https://raw.githubusercontent.com/prometheuxresearch/px-mcp-server/main/install.sh | bash
+```
+
+Or download and run manually:
+```bash
+wget https://raw.githubusercontent.com/prometheuxresearch/px-mcp-server/main/install.sh
+chmod +x install.sh
+./install.sh
+```
+
+**Windows (PowerShell):**
+```powershell
+Invoke-WebRequest -Uri "https://raw.githubusercontent.com/prometheuxresearch/px-mcp-server/main/install.ps1" -OutFile "install.ps1"
+.\install.ps1
+```
+
+The script will:
+- ✅ Install `pipx` (if not already installed)
+- ✅ Install `prometheux-mcp` package
+- ✅ Prompt for your credentials (URL, token, username, organization)
+- ✅ Automatically configure Claude Desktop
+- ✅ Create backups of existing configuration
+
+Then just restart Claude Desktop and you're ready!
+
+#### Option 2: Manual Install Using pipx
+
+If you prefer manual installation, use pipx to install the package in an isolated environment:
 
 **macOS:**
 ```bash
@@ -52,7 +83,11 @@ pipx install prometheux-mcp
 
 ### Configuration
 
-1. **Get your credentials** from your Prometheux admin or account settings:
+> **Note**: If you used the automated installation script (Option 1), configuration was done automatically. Skip to the "Using Prometheux with Claude" section below.
+
+**For manual installations (Option 2):**
+
+1. **Get your credentials** from your Prometheux account settings:
    - Server URL (e.g., `https://api.prometheux.ai`)
    - Authentication token
    - Username
@@ -71,9 +106,9 @@ pipx install prometheux-mcp
          "command": "/Users/YOUR_USERNAME/.local/bin/prometheux-mcp",
          "args": ["--url", "https://api.prometheux.ai"],
          "env": {
-           "PROMETHEUX_TOKEN": "your_token",
+           "PROMETHEUX_TOKEN": "your_token_here",
            "PROMETHEUX_USERNAME": "your_username",
-           "PROMETHEUX_ORGANIZATION": "your_organization"
+           "PROMETHEUX_ORGANIZATION": "your_org"
          }
        }
      }
@@ -89,7 +124,7 @@ pipx install prometheux-mcp
    > - **Windows:** `C:\\Users\\YOUR_USERNAME\\.local\\bin\\prometheux-mcp.exe` (use double backslashes in JSON)
    > - **Linux:** `/home/YOUR_USERNAME/.local/bin/prometheux-mcp`
    
-   > **Note:** The full path is automatically constructed from your username and organization. No need to include it in the URL!
+   > **Note:** Username and organization are required for API routing through the gateway.
    
    > **Custom URLs:** For on-premise deployments or custom URLs, replace `https://api.prometheux.ai` with your own server URL.
 
@@ -131,7 +166,7 @@ Once configured, just chat with Claude:
 Check that your Prometheux server URL is correct and accessible. Test with: `curl [YOUR_URL]/mcp/info`
 
 **"Authentication failed" error:**
-Verify your token, username, and organization are correct in the config.
+Verify your token is correct in the config. Generate a new token from your Prometheux account settings if needed.
 
 **Check logs:**
 - **macOS:** `~/Library/Logs/Claude/mcp-server-prometheux.log`
@@ -208,7 +243,12 @@ pip install -e ".[dev]"
      "mcpServers": {
        "prometheux": {
          "command": "/Users/YOUR_USERNAME/.local/bin/prometheux-mcp",
-         "args": ["--url", "http://localhost:8000", "--debug"]
+         "args": ["--url", "http://localhost:8000", "--debug"],
+         "env": {
+           "PROMETHEUX_TOKEN": "your_dev_token",
+           "PROMETHEUX_USERNAME": "your_username",
+           "PROMETHEUX_ORGANIZATION": "your_org"
+         }
        }
      }
    }
@@ -315,6 +355,30 @@ Executes a concept to derive new knowledge through Vadalog reasoning.
   "total_records": 2
 }
 ```
+
+---
+
+## For Maintainers
+
+### Releasing a New Version
+
+```bash
+# 1. Update version
+echo "0.1.6" > version.txt
+
+# 2. Build and publish to PyPI
+python -m build
+twine upload dist/*
+
+# 3. Commit and tag
+git add version.txt
+git commit -m "Release version 0.1.6"
+git push
+git tag v0.1.6
+git push origin v0.1.6
+```
+
+Users will automatically get the new version when they run the installation script or `pipx install prometheux-mcp`.
 
 ---
 

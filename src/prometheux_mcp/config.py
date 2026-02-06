@@ -24,8 +24,8 @@ class Settings:
     Environment Variables:
         PROMETHEUX_URL: Base URL of the Prometheux/JarvisPy server
         PROMETHEUX_TOKEN: Authentication token
-        PROMETHEUX_USERNAME: Username for authentication
-        PROMETHEUX_ORGANIZATION: Organization identifier
+        PROMETHEUX_USERNAME: Username for API routing
+        PROMETHEUX_ORGANIZATION: Organization for API routing
         PROMETHEUX_DEBUG: Enable debug mode ("true" or "1")
     """
     
@@ -72,28 +72,28 @@ class Settings:
                 "Prometheux URL is required. "
                 "Set via --url or PROMETHEUX_URL environment variable."
             )
+        if not self.username:
+            raise ValueError(
+                "Username is required. "
+                "Set via --username or PROMETHEUX_USERNAME environment variable."
+            )
+        if not self.organization:
+            raise ValueError(
+                "Organization is required. "
+                "Set via --organization or PROMETHEUX_ORGANIZATION environment variable."
+            )
     
     @property
     def base_url(self) -> str:
         """
-        Get the full base URL for API requests.
+        Get the base URL for API requests.
         
-        If username and organization are provided, automatically constructs
-        the full JarvisPy path: {url}/jarvispy/{organization}/{username}
-        
-        Otherwise, returns the URL as-is (for backward compatibility).
+        Builds the full path including jarvispy/{organization}/{username}
+        which is required for routing through the API Gateway in production.
         """
-        if not self.url:
-            return ""
-        
-        # If both username and organization are provided, construct the full path
-        if self.username and self.organization:
-            # Check if the URL already contains the jarvispy path
-            if "/jarvispy/" not in self.url:
-                return f"{self.url}/jarvispy/{self.organization}/{self.username}"
-        
-        # Return URL as-is if no username/org or path already included
-        return self.url
+        if not self.url or not self.organization or not self.username:
+            return self.url or ""
+        return f"{self.url}/jarvispy/{self.organization}/{self.username}"
     
     @property
     def mcp_endpoint(self) -> str:
