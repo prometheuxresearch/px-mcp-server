@@ -36,12 +36,12 @@ from .config import Settings
 @click.option(
     "--username",
     envvar="PROMETHEUX_USERNAME",
-    help="Username for authentication",
+    help="Username for routing",
 )
 @click.option(
     "--organization",
-    envvar="PROMETHEUX_ORGANIZATION", 
-    help="Organization identifier",
+    envvar="PROMETHEUX_ORGANIZATION",
+    help="Organization for routing",
 )
 @click.option(
     "--debug",
@@ -71,9 +71,9 @@ def main(
          "mcpServers": {
            "prometheux": {
              "command": "prometheux-mcp",
-             "args": ["--url", "https://your-server.com"],
+             "args": ["--url", "https://api.prometheux.ai"],
              "env": {
-               "PROMETHEUX_TOKEN": "your_token",
+               "PROMETHEUX_TOKEN": "your_token_here",
                "PROMETHEUX_USERNAME": "your_username",
                "PROMETHEUX_ORGANIZATION": "your_org"
              }
@@ -100,6 +100,7 @@ def main(
             print(f"  URL: {settings.url}", file=sys.stderr)
             print(f"  Username: {settings.username}", file=sys.stderr)
             print(f"  Organization: {settings.organization}", file=sys.stderr)
+            print(f"  Token: {'***' if settings.token else 'not set'}", file=sys.stderr)
         
         # Run the MCP server
         run_server(settings)
