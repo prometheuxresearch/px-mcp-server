@@ -31,12 +31,7 @@ The easiest way to install - download and run our installation script:
 
 **macOS/Linux:**
 ```bash
-curl -sSL https://raw.githubusercontent.com/prometheuxresearch/px-mcp-server/main/install.sh | bash
-```
-
-Or download and run manually:
-```bash
-wget https://raw.githubusercontent.com/prometheuxresearch/px-mcp-server/main/install.sh
+curl -sSL https://raw.githubusercontent.com/prometheuxresearch/px-mcp-server/main/install.sh -o install.sh
 chmod +x install.sh
 ./install.sh
 ```
