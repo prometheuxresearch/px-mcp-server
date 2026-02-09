@@ -173,5 +173,5 @@ Write-Host "Troubleshooting:" -ForegroundColor Yellow
 Write-Host "  • If tools don't appear, check Claude Desktop logs"
 Write-Host "  • Windows logs: %APPDATA%\Claude\logs\"
 Write-Host ""
-Write-Host "For support: davben@prometheux.co.uk" -ForegroundColor Green
+Write-Host "For support: davben@prometheux.co.uk, teodoro.baldazzi@prometheux.co.uk, support@prometheux.co.uk" -ForegroundColor Green
 Write-Host ""

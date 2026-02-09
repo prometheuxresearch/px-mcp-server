@@ -62,7 +62,7 @@ class PrometheuxClient:
         self._client = httpx.AsyncClient(
             base_url=self.settings.base_url,
             headers=self._get_headers(),
-            timeout=60.0,
+            timeout=1800.0,  # 30 minutes for long-running concept executions
         )
         return self
     
@@ -89,7 +89,7 @@ class PrometheuxClient:
             self._client = httpx.AsyncClient(
                 base_url=self.settings.base_url,
                 headers=self._get_headers(),
-                timeout=60.0,
+                timeout=1800.0,  # 30 minutes for long-running concept executions
             )
         return self._client
     
