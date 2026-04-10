@@ -1,28 +1,33 @@
 """
 MCP Server for Prometheux.
 
-Creates and runs the Model Context Protocol server that exposes
-Prometheux concepts and reasoning capabilities to AI agents.
+Creates a low-level MCP server that dynamically proxies tools from JarvisPy.
+Tools are discovered at runtime via ``tools/list`` and all ``tools/call``
+requests are forwarded transparently — no hard-coded tool definitions needed.
+
+Runs with stdio transport for Claude Desktop integration.
 
 Copyright (C) Prometheux Limited. All rights reserved.
 """
 
+import json
 import sys
-from typing import Any
+from typing import Any, Optional
 
-from mcp.server.fastmcp import FastMCP
+import mcp.types as types
+from mcp.server.lowlevel import Server
+from mcp.server.stdio import stdio_server
 
 from .config import Settings
 from .client import PrometheuxClient, PrometheuxError
 
 
-# Global settings and client (set when server is created)
 _settings: Settings | None = None
 _client: PrometheuxClient | None = None
+_cached_tools: Optional[list[types.Tool]] = None
 
 
-def get_client() -> PrometheuxClient:
-    """Get the Prometheux client instance."""
+def _get_client() -> PrometheuxClient:
     global _client, _settings
     if _client is None:
         if _settings is None:
@@ -31,143 +36,111 @@ def get_client() -> PrometheuxClient:
     return _client
 
 
-def create_server(settings: Settings) -> FastMCP:
+def _to_text_content(rpc_result: dict[str, Any]) -> list[types.TextContent]:
+    """Convert a ``tools/call`` RPC result into MCP TextContent objects."""
+    content = rpc_result.get("content", [])
+    if content and isinstance(content, list):
+        return [
+            types.TextContent(type="text", text=item.get("text", ""))
+            for item in content
+        ]
+    return [types.TextContent(type="text", text=json.dumps(rpc_result, indent=2))]
+
+
+def create_server(settings: Settings) -> Server:
     """
     Create and configure the MCP server.
-    
-    Args:
-        settings: Configuration settings for the server
-        
-    Returns:
-        Configured FastMCP server instance
+
+    Returns a ``mcp.server.lowlevel.Server`` that proxies all tool
+    traffic to JarvisPy.
     """
     global _settings
     _settings = settings
-    
-    # Create the MCP server
-    mcp = FastMCP("prometheux")
-    
-    # Register tools
-    _register_tools(mcp)
-    
-    return mcp
 
+    server = Server("prometheux")
 
-def _register_tools(mcp: FastMCP):
-    """Register all MCP tools."""
-    
-    @mcp.tool()
-    async def list_concepts(
-        project_id: str,
-        scope: str = "user"
-    ) -> dict[str, Any]:
-        """
-        List all concepts available in a project.
-        
-        Concepts are the building blocks of knowledge in Prometheux. Each concept
-        represents a predicate/relation with its schema, rules, and metadata.
-        
-        Args:
-            project_id: The unique identifier of the project to list concepts from
-            scope: The scope to search for concepts. Use "user" for personal concepts
-                   or "organization" to include shared organizational concepts.
-                   Defaults to "user".
-        
-        Returns:
-            A dictionary containing:
-            - concepts: List of concept objects, each with:
-                - predicate_name: The name of the concept/predicate
-                - fields: Dictionary mapping field names to their types
-                - column_count: Number of columns/fields in the concept
-                - is_input: Whether this is an input concept (no derivation rules)
-                - row_count: Number of records if the concept has been populated
-                - type: The type of datasource (e.g., 'postgresql', 'csv', 'api')
-                - description: Human-readable description of the concept
-            - count: Total number of concepts found
-        """
+    @server.list_tools()
+    async def handle_list_tools() -> list[types.Tool]:
+        global _cached_tools
+        if _cached_tools is not None:
+            return _cached_tools
+
+        client = _get_client()
+        result = await client.rpc("tools/list", {})
+
+        tools: list[types.Tool] = []
+        for t in result.get("tools", []):
+            tools.append(types.Tool(
+                name=t["name"],
+                description=t.get("description", ""),
+                inputSchema=t.get("inputSchema", {
+                    "type": "object", "properties": {},
+                }),
+            ))
+
+        _cached_tools = tools
+        if settings.debug:
+            print(f"Cached {len(tools)} tools from JarvisPy", file=sys.stderr)
+        return tools
+
+    @server.call_tool()
+    async def handle_call_tool(
+        name: str, arguments: dict | None = None,
+    ) -> list[types.TextContent]:
+        if settings.debug:
+            print(f"tools/call → {name}", file=sys.stderr)
+
+        client = _get_client()
+        call_args = arguments or {}
+
+        timeout = 1800.0 if name == "run_concept" else 120.0
+
         try:
-            client = get_client()
-            result = await client.list_concepts(project_id, scope)
-            return result
-        except PrometheuxError as e:
-            return {"error": str(e), "concepts": [], "count": 0}
-        except Exception as e:
-            return {"error": f"Unexpected error: {e}", "concepts": [], "count": 0}
-    
-    @mcp.tool()
-    async def run_concept(
-        project_id: str,
-        concept_name: str,
-        params: dict[str, Any] | None = None,
-        scope: str = "user",
-        force_rerun: bool = True,
-        persist_outputs: bool = False
-    ) -> dict[str, Any]:
-        """
-        Execute a concept to derive new knowledge through reasoning.
-        
-        This runs the Vadalog reasoning engine on the specified concept,
-        applying its rules to derive output facts from input data.
-        
-        Args:
-            project_id: The unique identifier of the project containing the concept
-            concept_name: The name of the concept/predicate to execute
-            params: Optional dictionary of parameters to pass to the reasoning engine.
-                    These can be used to filter inputs or configure execution.
-            scope: The scope to search for the concept. Use "user" for personal concepts
-                   or "organization" to include shared organizational concepts.
-                   Defaults to "user".
-            force_rerun: If True, re-execute even if results already exist.
-                        If False, return cached results when available.
-                        Defaults to True.
-            persist_outputs: If True, save the derived facts to the database.
-                            If False, return results without persisting.
-                            Defaults to False.
-        
-        Returns:
-            A dictionary containing:
-            - concept_name: The executed concept name
-            - message: Status message describing the execution result
-            - evaluation_results: The reasoning results including:
-                - resultSet: Dictionary mapping predicate names to their derived facts
-                - columnNames: Dictionary mapping predicate names to their column names
-            - predicates_populated: List of predicates that were populated with data
-            - total_records: Total number of records derived
-            - skipped_execution: True if cached results were returned (force_rerun=False)
-        """
-        try:
-            client = get_client()
-            result = await client.run_concept(
-                project_id=project_id,
-                concept_name=concept_name,
-                params=params,
-                scope=scope,
-                force_rerun=force_rerun,
-                persist_outputs=persist_outputs,
+            result = await client.rpc(
+                "tools/call",
+                {"name": name, "arguments": call_args},
+                timeout=timeout,
             )
-            return result
-        except PrometheuxError as e:
-            return {"error": str(e), "concept_name": concept_name}
-        except Exception as e:
-            return {"error": f"Unexpected error: {e}", "concept_name": concept_name}
+        except PrometheuxError as exc:
+            if settings.debug:
+                print(f"tools/call ← {name} FAILED: {exc}", file=sys.stderr)
+            return [types.TextContent(
+                type="text",
+                text=json.dumps({"error": str(exc)}),
+            )]
+
+        content = _to_text_content(result)
+        if settings.debug:
+            print(
+                f"tools/call ← {name} succeeded ({len(content)} content items)",
+                file=sys.stderr,
+            )
+        return content
+
+    return server
+
+
+async def _run_stdio(server: Server):
+    """Run the server with stdio transport."""
+    async with stdio_server() as (read_stream, write_stream):
+        await server.run(
+            read_stream, write_stream,
+            server.create_initialization_options(),
+        )
 
 
 def run_server(settings: Settings):
     """
     Run the MCP server with stdio transport.
-    
+
     This function blocks and handles MCP messages until the client disconnects.
-    
-    Args:
-        settings: Configuration settings for the server
     """
-    # Create the server
-    mcp = create_server(settings)
-    
+    import asyncio
+
+    server = create_server(settings)
+
     if settings.debug:
         print(f"MCP Server 'prometheux' starting...", file=sys.stderr)
         print(f"Connected to: {settings.base_url}", file=sys.stderr)
-    
-    # Run with stdio transport
-    mcp.run(transport="stdio")
 
+    asyncio.run(_run_stdio(server))
