@@ -1,7 +1,6 @@
 """Tests for the Prometheux HTTP client."""
 
 import pytest
-import httpx
 from pytest_httpx import HTTPXMock
 
 from prometheux_mcp.config import Settings
@@ -9,7 +8,6 @@ from prometheux_mcp.client import (
     PrometheuxClient,
     PrometheuxError,
     AuthenticationError,
-    NotFoundError,
 )
 
 
@@ -32,82 +30,12 @@ def client(settings):
 
 class TestPrometheuxClient:
     """Tests for the PrometheuxClient class."""
-    
+
     @pytest.mark.asyncio
-    async def test_list_concepts_success(self, client, httpx_mock: HTTPXMock):
-        """Test successful concept listing."""
+    async def test_rpc_tools_list(self, client, httpx_mock: HTTPXMock):
+        """Test tools/list RPC call."""
         httpx_mock.add_response(
-            url="https://api.prometheux.ai/mcp/messages",
-            json={
-                "jsonrpc": "2.0",
-                "result": {
-                    "content": [
-                        {
-                            "type": "text",
-                            "text": '{"concepts": [{"predicate_name": "test"}], "count": 1}'
-                        }
-                    ]
-                },
-                "id": 1
-            }
-        )
-        
-        result = await client.list_concepts("project-123")
-        
-        assert result["count"] == 1
-        assert result["concepts"][0]["predicate_name"] == "test"
-    
-    @pytest.mark.asyncio
-    async def test_run_concept_success(self, client, httpx_mock: HTTPXMock):
-        """Test successful concept execution."""
-        httpx_mock.add_response(
-            url="https://api.prometheux.ai/mcp/messages",
-            json={
-                "jsonrpc": "2.0",
-                "result": {
-                    "content": [
-                        {
-                            "type": "text",
-                            "text": '{"concept_name": "test", "total_records": 10}'
-                        }
-                    ]
-                },
-                "id": 1
-            }
-        )
-        
-        result = await client.run_concept("project-123", "test")
-        
-        assert result["concept_name"] == "test"
-        assert result["total_records"] == 10
-    
-    @pytest.mark.asyncio
-    async def test_authentication_error(self, client, httpx_mock: HTTPXMock):
-        """Test authentication error handling."""
-        httpx_mock.add_response(
-            url="https://api.prometheux.ai/mcp/messages",
-            status_code=401,
-        )
-        
-        with pytest.raises(AuthenticationError):
-            await client.list_concepts("project-123")
-    
-    @pytest.mark.asyncio
-    async def test_not_found_error(self, client, httpx_mock: HTTPXMock):
-        """Test not found error handling."""
-        httpx_mock.add_response(
-            url="https://api.prometheux.ai/mcp/messages",
-            status_code=404,
-        )
-        
-        with pytest.raises(NotFoundError):
-            await client.list_concepts("project-123")
-    
-    @pytest.mark.asyncio
-    async def test_mcp_list_tools(self, client, httpx_mock: HTTPXMock):
-        """Test listing MCP tools."""
-        httpx_mock.add_response(
-            url="https://api.prometheux.ai/mcp/messages",
+            url="https://api.prometheux.ai/jarvispy/test_org/test_user/mcp/messages",
             json={
                 "jsonrpc": "2.0",
                 "result": {
@@ -116,31 +44,73 @@ class TestPrometheuxClient:
                         {"name": "run_concept", "description": "Run concept"},
                     ]
                 },
-                "id": 1
-            }
+                "id": 1,
+            },
         )
-        
-        tools = await client.mcp_list_tools()
-        
-        assert len(tools) == 2
-        assert tools[0]["name"] == "list_concepts"
-        assert tools[1]["name"] == "run_concept"
-    
+
+        result = await client.rpc("tools/list", {})
+
+        assert len(result["tools"]) == 2
+        assert result["tools"][0]["name"] == "list_concepts"
+
     @pytest.mark.asyncio
-    async def test_context_manager(self, settings, httpx_mock: HTTPXMock):
-        """Test async context manager."""
+    async def test_rpc_tools_call(self, client, httpx_mock: HTTPXMock):
+        """Test tools/call RPC call."""
         httpx_mock.add_response(
-            url="https://api.prometheux.ai/mcp/messages",
+            url="https://api.prometheux.ai/jarvispy/test_org/test_user/mcp/messages",
             json={
                 "jsonrpc": "2.0",
                 "result": {
-                    "content": [{"type": "text", "text": '{"concepts": [], "count": 0}'}]
+                    "content": [
+                        {"type": "text", "text": '{"concepts": [], "count": 0}'}
+                    ]
                 },
-                "id": 1
-            }
+                "id": 1,
+            },
         )
-        
-        async with PrometheuxClient(settings) as client:
-            result = await client.list_concepts("project-123")
-            assert result["count"] == 0
 
+        result = await client.rpc(
+            "tools/call",
+            {"name": "list_concepts", "arguments": {"project_id": "p1"}},
+        )
+
+        assert "content" in result
+        assert result["content"][0]["type"] == "text"
+
+    @pytest.mark.asyncio
+    async def test_authentication_error(self, client, httpx_mock: HTTPXMock):
+        """Test authentication error handling."""
+        httpx_mock.add_response(
+            url="https://api.prometheux.ai/jarvispy/test_org/test_user/mcp/messages",
+            status_code=401,
+        )
+
+        with pytest.raises(AuthenticationError):
+            await client.rpc("tools/list", {})
+
+    @pytest.mark.asyncio
+    async def test_rpc_error_response(self, client, httpx_mock: HTTPXMock):
+        """Test JSON-RPC error handling."""
+        httpx_mock.add_response(
+            url="https://api.prometheux.ai/jarvispy/test_org/test_user/mcp/messages",
+            json={
+                "jsonrpc": "2.0",
+                "error": {"code": -32000, "message": "Tool not found"},
+                "id": 1,
+            },
+        )
+
+        with pytest.raises(PrometheuxError, match="Tool not found"):
+            await client.rpc("tools/call", {"name": "bad_tool", "arguments": {}})
+
+    @pytest.mark.asyncio
+    async def test_http_error(self, client, httpx_mock: HTTPXMock):
+        """Test non-200 HTTP response handling."""
+        httpx_mock.add_response(
+            url="https://api.prometheux.ai/jarvispy/test_org/test_user/mcp/messages",
+            status_code=500,
+            text="Internal Server Error",
+        )
+
+        with pytest.raises(PrometheuxError, match="status 500"):
+            await client.rpc("tools/list", {})
