@@ -27,6 +27,7 @@ class Settings:
         PROMETHEUX_USERNAME: Username for API routing
         PROMETHEUX_ORGANIZATION: Organization for API routing
         PROMETHEUX_DEBUG: Enable debug mode ("true" or "1")
+        PROMETHEUX_USE_POD_ROUTING: Use pod routing prefix ("false" to disable)
     """
     
     url: Optional[str] = field(default=None)
@@ -34,6 +35,7 @@ class Settings:
     username: Optional[str] = field(default=None)
     organization: Optional[str] = field(default=None)
     debug: bool = field(default=False)
+    use_pod_routing: bool = field(default=True)
     
     def __post_init__(self):
         """Load from environment variables if not provided."""
@@ -61,6 +63,11 @@ class Settings:
         if not self.debug:
             debug_env = os.environ.get("PROMETHEUX_DEBUG", "").lower()
             self.debug = debug_env in ("true", "1", "yes")
+        
+        # Pod routing
+        pod_routing_env = os.environ.get("PROMETHEUX_USE_POD_ROUTING", "").lower()
+        if pod_routing_env in ("false", "0", "no"):
+            self.use_pod_routing = False
         
         # Validate required settings
         self._validate()
@@ -93,6 +100,8 @@ class Settings:
         """
         if not self.url or not self.organization or not self.username:
             return self.url or ""
+        if not self.use_pod_routing:
+            return self.url
         return f"{self.url}/jarvispy/{self.organization}/{self.username}"
     
     @property
