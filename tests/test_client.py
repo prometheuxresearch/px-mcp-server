@@ -71,7 +71,7 @@ class TestPrometheuxClient:
 
         result = await client.rpc(
             "tools/call",
-            {"name": "list_concepts", "arguments": {"project_id": "p1"}},
+            {"name": "list_concepts", "arguments": {"ontology_id": "p1"}},
         )
 
         assert "content" in result

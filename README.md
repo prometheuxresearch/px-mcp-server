@@ -171,14 +171,19 @@ Verify your token is correct in the config. Generate a new token from your Prome
 
 ## Tool Reference
 
+This server forwards requests transparently, so the tool catalog comes from the
+Prometheux backend rather than from this package — new tools appear without a
+release here. Call `tools/list` for the current catalog; the two below are the
+ones you are most likely to reach for first.
+
 ### `list_concepts`
 
-Lists all concepts available in a project.
+Lists all concepts available in an ontology.
 
 **Parameters:**
 | Parameter | Type | Required | Default | Description |
 |-----------|------|----------|---------|-------------|
-| `project_id` | string | Yes | — | Project identifier |
+| `ontology_id` | string | Yes | — | Ontology identifier |
 | `scope` | string | No | `"user"` | `"user"` or `"organization"` |
 
 **Example response:**
@@ -206,12 +211,12 @@ Executes a concept to derive new knowledge through Vadalog reasoning.
 **Parameters:**
 | Parameter | Type | Required | Default | Description |
 |-----------|------|----------|---------|-------------|
-| `project_id` | string | Yes | — | Project identifier |
+| `ontology_id` | string | Yes | — | Ontology identifier |
 | `concept_name` | string | Yes | — | Concept to execute |
 | `params` | object | No | `{}` | Parameters for reasoning |
 | `scope` | string | No | `"user"` | `"user"` or `"organization"` |
 | `force_rerun` | boolean | No | `true` | Re-execute even if cached |
-| `persist_outputs` | boolean | No | `false` | Save results to database |
+| `persist_outputs` | boolean | No | `true` | Save results to database |
 
 **Example response:**
 ```json
