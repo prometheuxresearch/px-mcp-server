@@ -7,21 +7,20 @@ name: Publish
 # __version__ sat at 0.1.0 while PyPI served 0.1.11.
 #
 # Publishing from a tag fixes the provenance: the only thing that can reach
-# customers is a tagged commit that already reached main, and the two checks
-# below refuse anything else before a build starts.
+# customers is a tagged commit that already reached main, and the two checks in
+# the build job refuse anything else before a build starts.
 on:
   push:
     tags: ["v*"]
 
 jobs:
-  publish:
+  build:
+    # Deliberately holds no `id-token` permission. This job installs
+    # dependencies, runs the test suite and builds the distributions — a great
+    # deal of third-party code — and PyPI's guidance is to keep all of that out
+    # of any job that is able to mint a publishing token. A malicious dependency
+    # here can waste a release; it cannot ask for a credential.
     runs-on: ubuntu-latest
-    permissions:
-      # Trusted publishing: PyPI verifies this workflow's own OIDC identity, so
-      # there is no long-lived API token stored here to leak or rotate. Requires
-      # the one-time publisher setup on PyPI described in the README.
-      id-token: write
-      contents: read
     steps:
       - uses: actions/checkout@v4
         with:
@@ -77,6 +76,30 @@ jobs:
         run: |
           twine check dist/*
           ls -l dist/
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dist
+          path: dist/
+          if-no-files-found: error
+
+  publish:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      # The only permission this job has, and the only job that has it. PyPI
+      # verifies GitHub's signature on the token and matches its claims against
+      # the registered publisher: repository prometheuxresearch/px-mcp-server,
+      # workflow publish.yml. A copy of this file in another repository gets a
+      # token naming that repository, which PyPI refuses.
+      id-token: write
+    steps:
+      # Two steps on purpose: nothing but the artifact and the upload is in
+      # scope while the OIDC token exists. No checkout, no dependency install.
+      - uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist/
 
       - name: Publish to PyPI
         # No skip-existing: a version already on PyPI means the tag or
