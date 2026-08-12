@@ -158,8 +158,8 @@ Write-Host "Next steps:" -ForegroundColor Yellow
 Write-Host ""
 Write-Host "  1. Restart Claude Desktop completely (Right-click → Quit, then reopen)"
 Write-Host "  2. Look for the 🔨 (hammer) icon in Claude Desktop"
-Write-Host "  3. Verify 'Prometheux Knowledge Graph' appears in the tools list"
-Write-Host "  4. Test by asking Claude: 'List my Prometheux concepts'"
+Write-Host "  3. Verify 'prometheux' appears in the tools list"
+Write-Host "  4. Test by asking Claude: 'List my Prometheux ontologies'"
 Write-Host ""
 Write-Host "Configuration saved to:" -ForegroundColor Blue
 Write-Host "  $CONFIG_FILE"

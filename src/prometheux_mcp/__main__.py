@@ -18,6 +18,7 @@ Copyright (C) Prometheux Limited. All rights reserved.
 import sys
 import click
 
+from . import __version__
 from .server import run_server
 from .config import Settings
 
@@ -49,7 +50,7 @@ from .config import Settings
     envvar="PROMETHEUX_DEBUG",
     help="Enable debug logging",
 )
-@click.version_option()
+@click.version_option(__version__)
 def main(
     url: str | None,
     token: str | None,
@@ -58,10 +59,11 @@ def main(
     debug: bool,
 ):
     """
-    Prometheux MCP Server - Connect AI agents to Prometheux knowledge graphs.
+    Prometheux MCP Server - Connect AI agents to Prometheux ontologies.
     
     This server implements the Model Context Protocol (MCP) to expose
-    Prometheux concepts and reasoning capabilities to AI agents like Claude.
+    Prometheux ontologies, their concepts and reasoning capabilities to AI
+    agents like Claude.
     
     \b
     Example usage with Claude Desktop:
