@@ -289,22 +289,35 @@ determines how the concept is evaluated, not how it is called.
 
 ### Releasing a New Version
 
+Pushing a `v*` tag publishes to PyPI — see `.github/workflows/publish.yml`. Nothing
+is built from a laptop, so what customers install is always a commit that was
+merged and reviewed.
+
 ```bash
-# 1. Update version. This is the only place to change it: setup.py stamps it into
+# 1. Bump the version. This is the only place it lives: setup.py stamps it into
 #    the package metadata, and prometheux_mcp.__version__ reads it back out.
 echo "0.1.13" > version.txt
 
-# 2. Build and publish to PyPI
-python -m build
-twine upload dist/*
-
-# 3. Commit and tag
+# 2. Commit it and get it onto main (via a PR, as usual)
 git add version.txt
 git commit -m "Release version 0.1.13"
-git push
+
+# 3. Tag the merged commit and push the tag — this triggers the release
+git checkout main && git pull
 git tag v0.1.13
 git push origin v0.1.13
 ```
+
+The workflow refuses to publish if the tag and `version.txt` disagree, or if the
+tagged commit has not reached `main`. It then runs the tests, builds, and uploads.
+A version already on PyPI fails the upload rather than being skipped quietly.
+
+> **One-time PyPI setup.** The workflow authenticates with [trusted
+> publishing](https://docs.pypi.org/trusted-publishers/) rather than a stored API
+> token, so it must be registered once on PyPI: project `prometheux-mcp` →
+> Publishing → add a GitHub publisher with owner `prometheuxresearch`, repository
+> `px-mcp-server`, workflow `publish.yml`, no environment. Until that exists the
+> upload step fails with an OIDC error; nothing else in the workflow is affected.
 
 > **Pin the MCP SDK deliberately.** `install_requires` caps `mcp` below 2.0,
 > because the 2.x SDK removed the low-level decorators this server is built on.
@@ -312,7 +325,11 @@ git push origin v0.1.13
 > import — silently, since it breaks on their machine and not ours. Lift the cap
 > only together with a port to the 2.x server API.
 
-Users will automatically get the new version when they run the installation script or `pipx install prometheux-mcp`.
+Users get the new version when they run the installation script or
+`pipx install prometheux-mcp`.
+
+`deploy.sh` predates this workflow and uploads straight from the working tree,
+bypassing every check above. Prefer the tag.
 
 ---
 
