@@ -1,0 +1,90 @@
+name: CI
+
+# This package is pip-installed by customers, so a broken release is silent to
+# us and arrives one person at a time. That is what happened with `mcp` 2.0.0
+# (2026-07-28): it removed the low-level decorators this server is built on, and
+# because install_requires had no ceiling, every fresh install since then failed
+# on import. Nobody reported it. Nothing here ran to notice.
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+  # Dependency resolution can break with no commit of ours, which is exactly how
+  # the 2.0.0 break arrived. A weekly run finds that while it is still a red
+  # check rather than a customer install.
+  schedule:
+    - cron: "0 6 * * 1"
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        # setup.py claims >=3.10; check the ends of that range rather than
+        # trusting the classifier.
+        python-version: ["3.10", "3.13"]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          # No pip cache on purpose: a customer installing today resolves from
+          # scratch, so CI must too, or it will not see a new major until they do.
+
+      - name: Install
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e . -r requirements-dev.txt
+
+      - name: Report resolved dependency versions
+        run: pip freeze
+
+      - name: Test
+        run: pytest -q
+
+  install-from-built-package:
+    # The wheel is what customers actually get. Building and installing it in a
+    # clean environment is the only check that covers packaging errors and
+    # dependency resolution together — an editable install can hide both.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Build wheel and sdist
+        run: |
+          python -m pip install --upgrade pip build
+          python -m build
+
+      - name: Install the wheel into a clean environment
+        run: |
+          python -m venv /tmp/fresh
+          /tmp/fresh/bin/pip install dist/*.whl
+
+      - name: Report what a customer would get
+        run: /tmp/fresh/bin/pip freeze
+
+      - name: Construct the server
+        # The check that was missing. Installing the packages proves nothing:
+        # `mcp` 2.0.0 installs cleanly and only fails when create_server runs.
+        run: |
+          /tmp/fresh/bin/python -c "
+          from prometheux_mcp.server import create_server
+          from prometheux_mcp.config import Settings
+          server = create_server(Settings(
+              url='https://api.prometheux.ai',
+              token='ci', username='ci', organization='ci',
+          ))
+          print('create_server() OK:', server.name)
+          "
+
+      - name: Run the console script
+        # Catches a broken entry point in setup.py, which no import would show.
+        run: /tmp/fresh/bin/prometheux-mcp --help
