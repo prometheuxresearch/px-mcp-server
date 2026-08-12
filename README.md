@@ -4,7 +4,10 @@
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![License: BSD-3-Clause](https://img.shields.io/badge/License-BSD%203--Clause-blue.svg)](https://opensource.org/licenses/BSD-3-Clause)
 
-A [Model Context Protocol (MCP)](https://modelcontextprotocol.io) client that enables AI agents like Claude to interact with [Prometheux](https://prometheux.ai) knowledge graphs and reasoning capabilities.
+A [Model Context Protocol (MCP)](https://modelcontextprotocol.io) server that enables AI agents like Claude to interact with [Prometheux](https://prometheux.ai) ontologies and reasoning capabilities.
+
+> **Note**: This is the **local** version, designed for Claude Desktop and other
+> stdio clients. For Claude Web, use the remote MCP server.
 
 ---
 
@@ -12,10 +15,18 @@ A [Model Context Protocol (MCP)](https://modelcontextprotocol.io) client that en
 
 ### What This Does
 
-This package lets you use **Claude Desktop** to interact with your Prometheux projects:
-- List concepts in your projects
-- Run concepts to derive new knowledge
+This package lets **Claude Desktop** work inside your Prometheux ontologies:
+
+- Explore an ontology — its concepts, data sources, schema, and lineage
+- Run concepts to derive new facts, and preview the data behind them
+- Author and validate concepts of any kind: Vadalog logic, SQL, Cypher, Python,
+  and the `context` and `llm` kinds that bring unstructured knowledge and model
+  calls into the same lineage
+- Read and write Context Layer notes, manage snapshots, and build apps
 - All through natural conversation with Claude
+
+The full set of tools comes from the backend, not from this package — see
+[Available Tools](#available-tools).
 
 ### Prerequisites
 
@@ -129,18 +140,44 @@ pipx install prometheux-mcp
 
 Once configured, just chat with Claude:
 
-> "What concepts are available in project customer-analytics?"
+> "What concepts are available in ontology customer-analytics?"
 
-> "Run the churn_prediction concept in project customer-analytics"
+> "Run the churn_prediction concept in ontology customer-analytics"
 
-> "Show me the high_value_customers from project sales-data with min_value of 1000"
+> "Show me the high_value_customers from ontology sales-data with min_value of 1000"
+
+> "Write a concept that flags suppliers whose disputes are rising, and validate it before saving"
 
 ### Available Tools
 
-| Tool | Description |
-|------|-------------|
-| `list_concepts` | Lists all concepts in a project |
-| `run_concept` | Executes a concept to derive new knowledge |
+This server forwards requests to your Prometheux instance, which owns the tool
+catalog — so `tools/list` is the only authoritative answer to "what tools exist",
+and new tools appear without a release here. Ask Claude *"what tools do you
+have?"* to see the current set.
+
+Every tool carries MCP annotations (`readOnlyHint` / `destructiveHint` /
+`idempotentHint` / `openWorldHint`) so clients can warn before anything writes.
+They fall into four classes:
+
+**Read-only** — reads existing state, no side effects: `list_ontologies`,
+`list_concepts`, `get_concept`, `list_data_sources`, `preview_data_source`,
+`get_ontology_schema`, `list_apps`, `list_context_notes`.
+
+**Read-only via an external or LLM service** — derives an answer but persists
+nothing: `search_vadalog_docs`, `validate_concept`, `extract_concepts_from_document`.
+
+**Write** — creates or updates state: `run_concept`, `create_concept`,
+`create_ontology`, `create_ontology_snapshot`, `save_app`, `save_context_note`.
+
+**Destructive** — overwrites or removes state: `update_concept`,
+`save_ontology_schema`, `restore_snapshot`, `delete_concept`, `delete_app`,
+`delete_context_note`.
+
+> **Note:** Concept bodies are written to the `definition` parameter, whatever the
+> kind — Vadalog rules, a SQL or Cypher query, a Python body, or an LLM prompt
+> template. `context` concepts have no body and are configured through
+> `concept_config` instead. See
+> [Context and LLM concepts](https://docs.prometheux.ai/platform/context-and-llm-concepts).
 
 ### Troubleshooting
 
@@ -158,7 +195,14 @@ Once configured, just chat with Claude:
 3. Restart Claude Desktop
 
 **"Connection refused" error:**
-Check that your Prometheux server URL is correct and accessible. Test with: `curl [YOUR_URL]/mcp/info`
+Check that your Prometheux server URL is correct and reachable. The gateway routes
+on your organization and username, and `/mcp/info` requires your token, so test
+with all three:
+
+```bash
+curl -H "Authorization: Bearer YOUR_TOKEN" \
+  https://api.prometheux.ai/jarvispy/YOUR_ORG/YOUR_USERNAME/mcp/info
+```
 
 **"Authentication failed" error:**
 Verify your token is correct in the config. Generate a new token from your Prometheux account settings if needed.
@@ -171,10 +215,11 @@ Verify your token is correct in the config. Generate a new token from your Prome
 
 ## Tool Reference
 
-This server forwards requests transparently, so the tool catalog comes from the
-Prometheux backend rather than from this package — new tools appear without a
-release here. Call `tools/list` for the current catalog; the two below are the
-ones you are most likely to reach for first.
+Spelled out below are the two tools you are most likely to reach for first. For
+the rest, call `tools/list` — as [Available Tools](#available-tools) explains, the
+backend owns the catalog, so anything written here about the others would go stale
+the moment the backend adds one. Full signatures live in the
+[MCP documentation](https://docs.prometheux.ai/integrations/mcp/overview).
 
 ### `list_concepts`
 
@@ -206,7 +251,9 @@ Lists all concepts available in an ontology.
 
 ### `run_concept`
 
-Executes a concept to derive new knowledge through Vadalog reasoning.
+Executes a concept and returns the facts it derives. Works for every concept
+kind — Vadalog logic, SQL, Cypher, Python, `context` and `llm` — since the kind
+determines how the concept is evaluated, not how it is called.
 
 **Parameters:**
 | Parameter | Type | Required | Default | Description |
@@ -243,8 +290,9 @@ Executes a concept to derive new knowledge through Vadalog reasoning.
 ### Releasing a New Version
 
 ```bash
-# 1. Update version
-echo "0.1.6" > version.txt
+# 1. Update version. This is the only place to change it: setup.py stamps it into
+#    the package metadata, and prometheux_mcp.__version__ reads it back out.
+echo "0.1.13" > version.txt
 
 # 2. Build and publish to PyPI
 python -m build
@@ -252,11 +300,17 @@ twine upload dist/*
 
 # 3. Commit and tag
 git add version.txt
-git commit -m "Release version 0.1.6"
+git commit -m "Release version 0.1.13"
 git push
-git tag v0.1.6
-git push origin v0.1.6
+git tag v0.1.13
+git push origin v0.1.13
 ```
+
+> **Pin the MCP SDK deliberately.** `install_requires` caps `mcp` below 2.0,
+> because the 2.x SDK removed the low-level decorators this server is built on.
+> An uncapped release resolves to 2.x on a user's fresh install and fails on
+> import — silently, since it breaks on their machine and not ours. Lift the cap
+> only together with a port to the 2.x server API.
 
 Users will automatically get the new version when they run the installation script or `pipx install prometheux-mcp`.
 
@@ -264,7 +318,8 @@ Users will automatically get the new version when they run the installation scri
 
 ## Access to Prometheux Backend
 
-The Prometheux backend is required to use this MCP client. To request access:
+A Prometheux instance is required to use this server — it holds your ontologies and
+answers every tool call. To request access:
 
 - 📧 **Email**: davben@prometheux.co.uk, teodoro.baldazzi@prometheux.co.uk, or support@prometheux.co.uk
 - 🌐 **Website**: https://www.prometheux.ai
@@ -291,7 +346,7 @@ For issues, questions, or access requests:
 - **Homepage**: https://www.prometheux.ai
 - **PyPI**: https://pypi.org/project/prometheux-mcp/
 - **Email**: davben@prometheux.co.uk, teodoro.baldazzi@prometheux.co.uk, or support@prometheux.co.uk
-- **Documentation**: https://docs.prometheux.ai/mcp
+- **Documentation**: https://docs.prometheux.ai/integrations/mcp/local
 - **Issues**: [GitHub Issues](https://github.com/prometheuxresearch/px-mcp-server/issues)
 
 ## Related Projects
