@@ -6,21 +6,92 @@ name: Publish
 # since the script wrote the version bump but never committed it. That is how
 # __version__ sat at 0.1.0 while PyPI served 0.1.11.
 #
-# Publishing from a tag fixes the provenance: the only thing that can reach
-# customers is a tagged commit that already reached main, and the two checks in
-# the build job refuse anything else before a build starts.
+# Publishing from a tag fixed the provenance but left the release itself manual,
+# and the manual half is the half that fails. version.txt on main says 0.1.12,
+# PyPI serves 0.1.11, and this repository has no tags at all: the bump was
+# reviewed and merged, nobody pushed a tag, and so nothing was ever built.
+# prometheux-chain lost 0.3.2 the same way, and the first sign of it there was a
+# red check on another repository's pull request. A release that can be silently
+# skipped is reported by whoever depends on it next, which is too late and
+# somewhere else.
+#
+# So the merge is the release. The guard job reads version.txt and stops the run
+# when that version is already tagged, so an ordinary merge that does not bump
+# the version is a no-op.
+#
+# Dropping the tag trigger strengthens provenance rather than weakening it. The
+# two checks that used to guard the build asked whether the tag matched
+# version.txt and whether its commit had reached main; neither question can be
+# answered wrongly now, because the version *is* version.txt and the only commits
+# this trigger can build are on main. More to the point, neither check could be
+# trusted where it stood: a tag-triggered run reads this file from the tagged
+# commit, so a tag pushed at any commit arrived carrying the very checks that
+# were supposed to vet it. main's protection rules sit outside this file and
+# cannot be rewritten by the commit they are vetting.
+#
+# The tag is still created, after a successful upload rather than before the
+# build, which additionally means a failed publish can be re-run instead of
+# needing the tag deleted first.
+#
+# One workflow rather than "merge creates a tag, tag triggers publish", because a
+# tag pushed with the default GITHUB_TOKEN does not start another workflow run.
+# The two-file version would need a stored PAT — a long-lived secret this
+# repository otherwise does not have, and the reason Trusted Publishing is used
+# below. prometheux-chain and prometheux-cli arrived at the same arrangement for
+# the same reason.
 on:
   push:
-    tags: ["v*"]
+    branches: [main]
 
-# The build job needs nothing beyond reading the checkout. A job-level block
-# replaces this one rather than adding to it, so the publish job below still
-# ends up with id-token as its only permission.
+concurrency:
+  # Never abort a run half-way: cancelling between the upload and the tag leaves
+  # a version on PyPI with nothing in git recording that it shipped.
+  group: publish-main
+  cancel-in-progress: false
+
+# The guard and build jobs need nothing beyond reading the checkout. A job-level
+# block replaces this one rather than adding to it, so the publish job below
+# still ends up with id-token and attestations as its only permissions, and the
+# tag job with contents.
 permissions:
   contents: read
 
 jobs:
+  guard:
+    # Decides whether this push is a release at all. Most pushes to main are not:
+    # they change code without bumping version.txt, and re-running the build for
+    # them would either publish a duplicate — which PyPI refuses — or need a
+    # skip-existing flag that would hide a genuine version mistake.
+    runs-on: ubuntu-latest
+    outputs:
+      should_publish: ${{ steps.check.outputs.should_publish }}
+      version: ${{ steps.check.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # Tags are the record of what has already shipped, and the default
+          # shallow fetch does not bring them.
+          fetch-depth: 0
+
+      - id: check
+        run: |
+          version="$(tr -d '[:space:]' < version.txt)"
+          if [ -z "$version" ]; then
+            echo "::error::version.txt is empty; setup.py stamps it into the package, so there is no version to release."
+            exit 1
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          if [ -n "$(git tag -l "v$version")" ]; then
+            echo "v$version is already tagged — this push released nothing."
+            echo "should_publish=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "v$version is not tagged yet — releasing it."
+            echo "should_publish=true" >> "$GITHUB_OUTPUT"
+          fi
+
   build:
+    needs: guard
+    if: needs.guard.outputs.should_publish == 'true'
     # Deliberately holds no `id-token` permission. This job installs
     # dependencies, runs the test suite and builds the distributions — a great
     # deal of third-party code — and PyPI's guidance is to keep all of that out
@@ -29,29 +100,6 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-        with:
-          # The ancestry check below needs real history, which the default
-          # shallow fetch of a single tag ref does not have.
-          fetch-depth: 0
-
-      - name: Require the tag to match version.txt
-        run: |
-          tag_version="${GITHUB_REF_NAME#v}"
-          file_version="$(tr -d '[:space:]' < version.txt)"
-          if [ "$tag_version" != "$file_version" ]; then
-            echo "::error::Tag ${GITHUB_REF_NAME} declares ${tag_version} but version.txt says ${file_version}. setup.py stamps version.txt into the package, so this would publish ${file_version} under a tag naming ${tag_version}."
-            exit 1
-          fi
-          echo "Tag and version.txt agree on ${file_version}."
-
-      - name: Require the tag to be on main
-        run: |
-          git fetch --no-tags origin main
-          if ! git merge-base --is-ancestor "${GITHUB_SHA}" origin/main; then
-            echo "::error::${GITHUB_REF_NAME} points at a commit that has not reached origin/main. Customers pip-install this package, so a release has to be merged and reviewed first."
-            exit 1
-          fi
-          echo "Tagged commit is on main."
 
       - uses: actions/setup-python@v5
         with:
@@ -73,6 +121,21 @@ jobs:
         # a release is the last moment where a red check is still free.
         run: pytest -q
 
+      - name: Check the version being built is the one the guard decided to release
+        # setup.py reads version.txt at build time, so these agree by
+        # construction — unless the working tree this job saw differs from the one
+        # the guard read, which is the failure this catches before an artifact
+        # reaches PyPI under the wrong name.
+        env:
+          EXPECTED: ${{ needs.guard.outputs.version }}
+        run: |
+          built="$(python -c 'import prometheux_mcp; print(prometheux_mcp.__version__)')"
+          if [ "$built" != "$EXPECTED" ]; then
+            echo "::error::guard resolved $EXPECTED but the package reports $built."
+            exit 1
+          fi
+          echo "Building $built."
+
       - name: Build
         run: |
           rm -rf build dist ./*.egg-info
@@ -83,31 +146,150 @@ jobs:
           twine check dist/*
           ls -l dist/
 
+      - name: Record what this release contains (SBOM + checksums)
+        # Under artifacts/, never dist/: the publish job uploads everything in
+        # dist/ to PyPI, and an SBOM is not a distribution.
+        #
+        # The SBOM describes a clean install of the built wheel rather than this
+        # job's environment, which also holds the dev requirements. The resolved
+        # transitive versions captured here are the only record of what someone
+        # installing this version actually received — the question asked after a
+        # dependency turns out to be bad, and the one that took two weeks to
+        # answer for `mcp` 2.0.0.
+        run: |
+          mkdir -p artifacts
+          python -m venv /tmp/sbom-env
+          /tmp/sbom-env/bin/pip install --upgrade pip
+          /tmp/sbom-env/bin/pip install dist/*.whl
+          pip install cyclonedx-bom
+          cyclonedx-py environment /tmp/sbom-env \
+            --output-format JSON --output-file artifacts/sbom.cyclonedx.json
+          sha256sum dist/* artifacts/sbom.cyclonedx.json > artifacts/SHA256SUMS
+          cat artifacts/SHA256SUMS
+
       - uses: actions/upload-artifact@v4
         with:
           name: dist
           path: dist/
           if-no-files-found: error
 
+      - uses: actions/upload-artifact@v4
+        # Separate from dist/ so the publish job can download the distributions
+        # alone and hand PyPI exactly what belongs there.
+        with:
+          name: sbom
+          path: artifacts/
+          if-no-files-found: error
+
   publish:
-    needs: build
+    needs: [guard, build]
+    if: needs.guard.outputs.should_publish == 'true'
     runs-on: ubuntu-latest
+    # A trusted publisher is bound to this workflow's *filename*, not to a ref:
+    # PyPI's half of the trust carries no branch constraint, so the trigger at
+    # the top of this file is all that keeps a release on main — and a trigger
+    # is one more line that anyone with write access can rewrite on a branch of
+    # their own, where main's protection rules never see it.
+    #
+    # Two settings outside this file turn that into a real restriction, and
+    # neither works without the other. The publisher registered on PyPI names
+    # this environment, so a run that drops the key below mints a token with no
+    # environment claim and PyPI refuses it; the environment's deployment branch
+    # policy allows main only, so the key cannot be claimed from anywhere else.
+    #
+    # A branch rule is what makes this checkable at all, and it is the reason the
+    # trigger above is a branch rather than a tag: the policy is matched against
+    # the run's GITHUB_REF, which for a tag push names the tag and says nothing
+    # about whether that tag was reviewed.
+    environment: pypi
     permissions:
-      # The only permission this job has, and the only job that has it. PyPI
-      # verifies GitHub's signature on the token and matches its claims against
-      # the registered publisher: repository prometheuxresearch/px-mcp-server,
-      # workflow publish.yml. A copy of this file in another repository gets a
-      # token naming that repository, which PyPI refuses.
+      # PyPI verifies GitHub's signature on the token and matches its claims
+      # against the registered publisher: repository
+      # prometheuxresearch/px-mcp-server, workflow publish.yml. A copy of this
+      # file in another repository gets a token naming that repository, which
+      # PyPI refuses. That binding to the filename is also why this file is still
+      # publish.yml: renaming it would invalidate the registered publisher and
+      # every upload with it.
       id-token: write
+      # Signing the provenance statement below, and nothing else. Notably not
+      # contents: the tag job holds that separately, so neither job can both
+      # write to the repository and mint a publishing credential.
+      attestations: write
     steps:
-      # Two steps on purpose: nothing but the artifact and the upload is in
-      # scope while the OIDC token exists. No checkout, no dependency install.
+      # Still nothing here that runs code we did not write: no checkout, and no
+      # dependency install, so no third-party package executes while the OIDC
+      # token is in scope. Both actions below are first-party and install nothing.
       - uses: actions/download-artifact@v4
         with:
           name: dist
           path: dist/
 
+      - name: Attest build provenance
+        # Signs a statement that this workflow, at this commit, produced these
+        # exact files, and records it in a public transparency log. Not a
+        # duplicate of the PEP 740 attestations gh-action-pypi-publish sends
+        # below: those are verified through PyPI, whereas this one answers "did
+        # prometheuxresearch build this?" about a wheel someone already has, via
+        # `gh attestation verify`, without PyPI in the trust path.
+        uses: actions/attest-build-provenance@v4
+        with:
+          subject-path: "dist/*"
+
       - name: Publish to PyPI
-        # No skip-existing: a version already on PyPI means the tag or
-        # version.txt is wrong, and failing loudly is the point.
+        # No skip-existing: a version already on PyPI means version.txt is wrong,
+        # and failing loudly is the point.
         uses: pypa/gh-action-pypi-publish@release/v1
+
+  tag:
+    needs: [guard, publish]
+    if: needs.guard.outputs.should_publish == 'true'
+    # Last, so that the tag means "this version is on PyPI" rather than "someone
+    # intended to release this". It is also what the guard reads on the next
+    # push, so a run that fails before the upload leaves nothing behind and can
+    # simply be re-run.
+    runs-on: ubuntu-latest
+    permissions:
+      # Held here rather than in the publish job, so no single job can both write
+      # to the repository and mint a publishing credential.
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Tag the released commit
+        # Plain git rather than a release action: this is the one job that can
+        # write to the repository, and the less third-party code runs inside it
+        # the better. Nothing listens for tags any more, so this pushes a record,
+        # not a trigger — which is also why a ruleset restricting who may create
+        # `v*` here would need to let this bot through.
+        env:
+          VERSION: ${{ needs.guard.outputs.version }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git tag -a "v$VERSION" -m "prometheux-mcp $VERSION"
+          git push origin "v$VERSION"
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: sbom
+          path: artifacts/
+
+      - name: Publish the GitHub Release
+        # Somewhere to put the SBOM and the checksums: PyPI stores neither, and
+        # an artifact from this run expires. The release is attached to the tag
+        # pushed above, which is why this step follows it.
+        #
+        # gh rather than a release action, for the same reason the tag uses plain
+        # git — gh is preinstalled on the runner and adds no third-party code to
+        # the one job that can write here.
+        #
+        # --generate-notes because this repository keeps no CHANGELOG.md.
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          VERSION: ${{ needs.guard.outputs.version }}
+        run: |
+          gh release create "v$VERSION" \
+            --title "v$VERSION" \
+            --generate-notes \
+            artifacts/sbom.cyclonedx.json \
+            artifacts/SHA256SUMS
