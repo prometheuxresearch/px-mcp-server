@@ -1,0 +1,31 @@
+# Configuration for the secret scan in .github/workflows/ci.yml.
+#
+# useDefault keeps the entire upstream rule set. This file only ever subtracts
+# from it, and only for a string that is demonstrably not a secret.
+
+[extend]
+useDefault = true
+
+[[allowlists]]
+description = """
+The troubleshooting section of the README shows how to reach the gateway with
+curl, and the header in that example reads `Authorization: Bearer YOUR_TOKEN`.
+The curl-auth-header rule matches the shape of an auth header rather than the
+value carried in it, so the placeholder trips it at an entropy of 3.12.
+
+An allowlist is the fix rather than an edit to the README because the scan reads
+every commit: the line is in 55e1afe, and rewording it at HEAD would leave it
+exactly where gitleaks found it.
+
+`condition` is the load-bearing line below. It defaults to OR, under which each
+criterion allowlists on its own — and `paths` alone would then excuse every
+curl-auth-header finding anywhere in the README, including a real token pasted
+into it. With AND all three must hold: the rule, the file, and the placeholder
+text itself. Replacing YOUR_TOKEN with a live credential on that same line is
+still a finding.
+"""
+targetRules = ["curl-auth-header"]
+condition = "AND"
+regexTarget = "line"
+regexes = ['''Authorization: Bearer YOUR_TOKEN''']
+paths = ['''README\.md''']
