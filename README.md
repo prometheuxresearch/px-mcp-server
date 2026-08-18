@@ -289,35 +289,41 @@ determines how the concept is evaluated, not how it is called.
 
 ### Releasing a New Version
 
-Pushing a `v*` tag publishes to PyPI — see `.github/workflows/publish.yml`. Nothing
-is built from a laptop, so what customers install is always a commit that was
-merged and reviewed.
+Merging a version bump into `main` publishes to PyPI — see
+`.github/workflows/publish.yml`. Nothing is built from a laptop, so what customers
+install is always a commit that was reviewed.
 
 ```bash
 # 1. Bump the version. This is the only place it lives: setup.py stamps it into
 #    the package metadata, and prometheux_mcp.__version__ reads it back out.
 echo "0.1.13" > version.txt
 
-# 2. Commit it and get it onto main (via a PR, as usual)
-git add version.txt
-git commit -m "Release version 0.1.13"
-
-# 3. Tag the merged commit and push the tag — this triggers the release
-git checkout main && git pull
-git tag v0.1.13
-git push origin v0.1.13
+# 2. Open a PR with that change and merge it. That is the whole release.
 ```
 
-The workflow refuses to publish if the tag and `version.txt` disagree, or if the
-tagged commit has not reached `main`. It then runs the tests, builds, and uploads.
-A version already on PyPI fails the upload rather than being skipped quietly.
+The guard job compares `version.txt` against the tags that already exist, so a
+merge that does not bump the version is a no-op. A merge that does bump it runs the
+tests, builds, publishes, attests the artifacts, tags the commit `v0.1.13`, and
+opens a GitHub Release with the SBOM and checksums attached. A version already on
+PyPI fails the upload rather than being skipped quietly.
+
+Do not push a `v*` tag by hand. Nothing listens for tags: the tag is written after
+a successful upload as the record of what shipped, and it is what the guard reads
+to decide whether the next merge is a release.
 
 > **One-time PyPI setup.** The workflow authenticates with [trusted
 > publishing](https://docs.pypi.org/trusted-publishers/) rather than a stored API
 > token, so it must be registered once on PyPI: project `prometheux-mcp` →
 > Publishing → add a GitHub publisher with owner `prometheuxresearch`, repository
-> `px-mcp-server`, workflow `publish.yml`, no environment. Until that exists the
-> upload step fails with an OIDC error; nothing else in the workflow is affected.
+> `px-mcp-server`, workflow `publish.yml`, environment `pypi`.
+>
+> The environment name is not optional. A trusted publisher is bound to the
+> workflow filename rather than to any branch, so without it a branch carrying a
+> modified `publish.yml` can mint a real publishing token. Naming `pypi` on both
+> sides — and restricting that environment to `main` under Settings →
+> Environments → `pypi` → deployment branch policy — is what ties a release to a
+> reviewed commit. The environment has to exist before the workflow runs, or the
+> publish job fails with `Missing environment 'pypi'`.
 
 > **Pin the MCP SDK deliberately.** `install_requires` caps `mcp` below 2.0,
 > because the 2.x SDK removed the low-level decorators this server is built on.
@@ -327,9 +333,6 @@ A version already on PyPI fails the upload rather than being skipped quietly.
 
 Users get the new version when they run the installation script or
 `pipx install prometheux-mcp`.
-
-`deploy.sh` predates this workflow and uploads straight from the working tree,
-bypassing every check above. Prefer the tag.
 
 ---
 
