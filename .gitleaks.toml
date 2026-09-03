@@ -14,7 +14,7 @@ The curl-auth-header rule matches the shape of an auth header rather than the
 value carried in it, so the placeholder trips it at an entropy of 3.12.
 
 An allowlist is the fix rather than an edit to the README because the scan reads
-every commit: the line is in 55e1afe, and rewording it at HEAD would leave it
+every commit: the line is in e282a00, and rewording it at HEAD would leave it
 exactly where gitleaks found it.
 
 `condition` is the load-bearing line below. It defaults to OR, under which each
