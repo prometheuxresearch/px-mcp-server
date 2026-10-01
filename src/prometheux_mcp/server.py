@@ -5,6 +5,12 @@ Creates a low-level MCP server that dynamically proxies tools from JarvisPy.
 Tools are discovered at runtime via ``tools/list`` and all ``tools/call``
 requests are forwarded transparently — no hard-coded tool definitions needed.
 
+JarvisPy's ``initialize`` instructions are forwarded too: they carry the same
+context block the embedded Prometheux assistant has in its system prompt (how
+context reaches the model, the skills index, the user's standing rules), so a
+host that surfaces server instructions governs this client by the same rules.
+Hosts that drop instructions can call the ``get_session_context`` tool instead.
+
 Runs with stdio transport for Claude Desktop integration.
 
 Copyright (C) Prometheux Limited. All rights reserved.
@@ -120,8 +126,51 @@ def create_server(settings: Settings) -> Server:
     return server
 
 
-async def _run_stdio(server: Server):
+# JarvisPy renders the instructions per caller (the user's rules are fetched
+# from the database), so a slow backend must not stall the host's handshake:
+# past this budget the client starts without instructions and the model can
+# still fetch the block through get_session_context.
+_INSTRUCTIONS_TIMEOUT = 10.0
+
+
+async def fetch_instructions(settings: Settings) -> Optional[str]:
+    """Ask JarvisPy for its ``initialize`` instructions; None if unavailable."""
+    try:
+        result = await _get_client().rpc(
+            "initialize",
+            {
+                "protocolVersion": "2024-11-05",
+                "capabilities": {},
+                "clientInfo": {"name": "prometheux-mcp", "version": _package_version()},
+            },
+            timeout=_INSTRUCTIONS_TIMEOUT,
+        )
+    except PrometheuxError as exc:
+        if settings.debug:
+            print(f"initialize ← no instructions: {exc}", file=sys.stderr)
+        return None
+    instructions = result.get("instructions")
+    if settings.debug:
+        print(
+            f"initialize ← {len(instructions or '')} chars of instructions",
+            file=sys.stderr,
+        )
+    return instructions or None
+
+
+def _package_version() -> str:
+    try:
+        from . import __version__
+        return __version__
+    except Exception:  # pragma: no cover — import cycle or missing metadata
+        return "unknown"
+
+
+async def _run_stdio(server: Server, settings: Settings):
     """Run the server with stdio transport."""
+    # The host's own initialize request waits in the pipe while this runs; the
+    # low-level Server reads ``instructions`` when it builds the handshake reply.
+    server.instructions = await fetch_instructions(settings)
     async with stdio_server() as (read_stream, write_stream):
         await server.run(
             read_stream, write_stream,
@@ -143,4 +192,4 @@ def run_server(settings: Settings):
         print(f"MCP Server 'prometheux' starting...", file=sys.stderr)
         print(f"Connected to: {settings.base_url}", file=sys.stderr)
 
-    asyncio.run(_run_stdio(server))
+    asyncio.run(_run_stdio(server, settings))
