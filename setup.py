@@ -21,8 +21,9 @@ setup(
         # Capped below 2.0: the 2.x SDK removed the low-level `Server.list_tools`
         # and `Server.call_tool` decorators this server is built on, so an
         # uncapped install resolves to 2.x and fails on import. Lift the cap only
-        # together with a port to the 2.x server API.
-        "mcp>=1.0.0,<2.0.0",
+        # together with a port to the 2.x server API. 1.10 is the first with
+        # elicitation, which asks the user before a write.
+        "mcp>=1.10.0,<2.0.0",
         "httpx>=0.25.0",
         "pydantic>=2.0.0",
         "pydantic-settings>=2.0.0",
