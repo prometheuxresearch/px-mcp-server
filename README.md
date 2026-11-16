@@ -136,6 +136,33 @@ pipx install prometheux-mcp
 
 3. **Restart Claude Desktop** (quit completely with Cmd+Q, then reopen)
 
+#### Optional: the gateway, with Prometheux asking before writes
+
+By default Claude gets every Prometheux tool, about a hundred definitions it
+re-reads on every turn. With `PROMETHEUX_MCP_SURFACE=gateway` (or
+`--surface gateway`) it gets three: `describe`, `call` and `write`, which run
+the others by name, with an index of every tool in the server instructions.
+Sessions read far fewer tokens, at the same results.
+
+On the gateway Prometheux asks you before a write your
+[assistant settings](https://platform.prometheux.ai/settings/assistant) do not
+already allow: *Allow once*, *Always allow* or *Deny*, in Claude's chat when the
+client supports MCP elicitation, otherwise under *Pending approvals* in those
+settings, where Claude sends you. A client that approves every tool on its own
+therefore still cannot run a delete or a share without you.
+
+```json
+"env": {
+  "PROMETHEUX_TOKEN": "your_token_here",
+  "PROMETHEUX_USERNAME": "your_username",
+  "PROMETHEUX_ORGANIZATION": "your_org",
+  "PROMETHEUX_MCP_SURFACE": "gateway"
+}
+```
+
+To keep the full tool list and still have Prometheux ask before writes, set
+`PROMETHEUX_MCP_CONFIRM_ON_SERVER=true` instead.
+
 ### Usage
 
 Once configured, just chat with Claude:

@@ -48,6 +48,7 @@ class PrometheuxClient:
                     "Content-Type": "application/json",
                     "Accept": "application/json",
                     **self.settings.get_auth_headers(),
+                    **self.settings.get_surface_headers(),
                 },
                 timeout=1800.0,
             )

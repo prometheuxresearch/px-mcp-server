@@ -10,6 +10,13 @@ import os
 from dataclasses import dataclass, field
 from typing import Optional
 
+# Mirror JarvisPy's app/mcp/gateway.py and app/mcp/server_confirmation.py.
+SURFACE_HEADER = "X-Prometheux-MCP-Surface"
+SURFACE_GATEWAY = "gateway"
+SURFACE_FULL = "full"
+CONFIRM_HEADER = "X-Prometheux-MCP-Confirm"
+CONFIRM_ON_SERVER = "server"
+
 
 @dataclass
 class Settings:
@@ -28,6 +35,10 @@ class Settings:
         PROMETHEUX_ORGANIZATION: Organization for API routing
         PROMETHEUX_DEBUG: Enable debug mode ("true" or "1")
         PROMETHEUX_USE_POD_ROUTING: Use pod routing prefix ("false" to disable)
+        PROMETHEUX_MCP_SURFACE: "gateway" for the gateway surface, "full" (default)
+            for the full tool list
+        PROMETHEUX_MCP_CONFIRM_ON_SERVER: Let Prometheux ask the user before writes
+            on the full tool list ("true" or "1"); the gateway always does
     """
     
     url: Optional[str] = field(default=None)
@@ -36,6 +47,8 @@ class Settings:
     organization: Optional[str] = field(default=None)
     debug: bool = field(default=False)
     use_pod_routing: bool = field(default=True)
+    surface: Optional[str] = field(default=None)
+    confirm_on_server: bool = field(default=False)
     
     def __post_init__(self):
         """Load from environment variables if not provided."""
@@ -68,6 +81,17 @@ class Settings:
         pod_routing_env = os.environ.get("PROMETHEUX_USE_POD_ROUTING", "").lower()
         if pod_routing_env in ("false", "0", "no"):
             self.use_pod_routing = False
+
+        # Surface: absent or "full" is the full tool list
+        if self.surface is None:
+            self.surface = os.environ.get("PROMETHEUX_MCP_SURFACE")
+        self.surface = (self.surface or "").strip().lower() or None
+        if self.surface == SURFACE_FULL:
+            self.surface = None
+
+        if not self.confirm_on_server:
+            confirm_env = os.environ.get("PROMETHEUX_MCP_CONFIRM_ON_SERVER", "").lower()
+            self.confirm_on_server = confirm_env in ("true", "1", "yes")
         
         # Validate required settings
         self._validate()
@@ -88,6 +112,11 @@ class Settings:
             raise ValueError(
                 "Organization is required. "
                 "Set via --organization or PROMETHEUX_ORGANIZATION environment variable."
+            )
+        if self.surface not in (None, SURFACE_GATEWAY):
+            raise ValueError(
+                f"Unknown surface {self.surface!r}: use 'gateway' or 'full'. "
+                "Set via --surface or PROMETHEUX_MCP_SURFACE environment variable."
             )
     
     @property
@@ -119,5 +148,14 @@ class Settings:
         headers = {}
         if self.token:
             headers["Authorization"] = f"Bearer {self.token}"
+        return headers
+
+    def get_surface_headers(self) -> dict[str, str]:
+        """Headers that pick how JarvisPy lists its tools and who confirms writes."""
+        headers = {}
+        if self.surface:
+            headers[SURFACE_HEADER] = self.surface
+        if self.confirm_on_server:
+            headers[CONFIRM_HEADER] = CONFIRM_ON_SERVER
         return headers
 

@@ -50,6 +50,19 @@ from .config import Settings
     envvar="PROMETHEUX_DEBUG",
     help="Enable debug logging",
 )
+@click.option(
+    "--surface",
+    type=click.Choice(["full", "gateway"], case_sensitive=False),
+    envvar="PROMETHEUX_MCP_SURFACE",
+    help="'gateway' lists describe, call and write instead of every tool; "
+         "Prometheux then asks you before writes. Default: full.",
+)
+@click.option(
+    "--confirm-on-server",
+    is_flag=True,
+    envvar="PROMETHEUX_MCP_CONFIRM_ON_SERVER",
+    help="On the full tool list, let Prometheux ask you before writes",
+)
 @click.version_option(__version__)
 def main(
     url: str | None,
@@ -57,6 +70,8 @@ def main(
     username: str | None,
     organization: str | None,
     debug: bool,
+    surface: str | None,
+    confirm_on_server: bool,
 ):
     """
     Prometheux MCP Server - Connect AI agents to Prometheux ontologies.
@@ -95,6 +110,8 @@ def main(
             username=username,
             organization=organization,
             debug=debug,
+            surface=surface,
+            confirm_on_server=confirm_on_server,
         )
         
         if debug:
@@ -102,6 +119,7 @@ def main(
             print(f"  URL: {settings.url}", file=sys.stderr)
             print(f"  Username: {settings.username}", file=sys.stderr)
             print(f"  Organization: {settings.organization}", file=sys.stderr)
+            print(f"  Surface: {settings.surface or 'full'}", file=sys.stderr)
             print(f"  Token: {'***' if settings.token else 'not set'}", file=sys.stderr)
         
         # Run the MCP server
